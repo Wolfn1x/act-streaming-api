@@ -22,6 +22,10 @@ Crear una API publica de streaming con reglas claras, parametros controlados y e
 2. `GET /api/v1/rules`
 3. `GET /api/v1/stations`
 4. `GET /api/v1/report`
+5. `GET /api/v1/favorites`
+6. `POST /api/v1/favorites`
+7. `PUT /api/v1/favorites/:id`
+8. `DELETE /api/v1/favorites/:id`
 
 ## Reglas y Parametros de `/api/v1/stations`
 
@@ -39,6 +43,27 @@ Crear una API publica de streaming con reglas claras, parametros controlados y e
   - `actions`: bitacora de acciones de uso (metodo, ruta, estado, duracion, ip, timestamp).
   - `meta`: resumen de acciones registradas.
 
+## Reglas y Body de `/api/v1/favorites`
+
+### POST `/api/v1/favorites`
+
+- Body JSON requerido:
+  - `name`: string (2-80)
+  - `streamUrl`: URL valida (`http` o `https`)
+- Body JSON opcional:
+  - `country`: string (max 60)
+  - `tags`: array de strings o string separado por comas
+
+### PUT `/api/v1/favorites/:id`
+
+- `:id` debe ser entero positivo.
+- Body parcial permitido (`name`, `streamUrl`, `country`, `tags`).
+- Debes enviar al menos un campo.
+
+### DELETE `/api/v1/favorites/:id`
+
+- `:id` debe ser entero positivo.
+
 Reglas globales:
 
 - Rate limit: `60` solicitudes por minuto por IP.
@@ -55,7 +80,43 @@ curl "http://localhost:3000/api/v1/rules"
 curl "http://localhost:3000/api/v1/stations?top=true&order=votes&limit=10"
 curl "http://localhost:3000/api/v1/stations?q=rock&country=US&order=bitrate&limit=12"
 curl "http://localhost:3000/api/v1/report?limit=20"
+curl "http://localhost:3000/api/v1/favorites"
 ```
+
+## Ejemplos para Postman (POST, PUT, DELETE)
+
+### POST crear favorito
+
+- Method: `POST`
+- URL: `https://act-streaming-api.onrender.com/api/v1/favorites`
+- Body -> raw -> JSON:
+
+```json
+{
+  "name": "Rockabilly-radio.net",
+  "streamUrl": "http://lin3.ash.fast-serv.com:6026/stream_96",
+  "country": "United States",
+  "tags": ["rockabilly", "classic"]
+}
+```
+
+### PUT actualizar favorito
+
+- Method: `PUT`
+- URL: `https://act-streaming-api.onrender.com/api/v1/favorites/1`
+- Body -> raw -> JSON:
+
+```json
+{
+  "name": "Rockabilly Radio Updated",
+  "tags": "rockabilly, oldies, live"
+}
+```
+
+### DELETE eliminar favorito
+
+- Method: `DELETE`
+- URL: `https://act-streaming-api.onrender.com/api/v1/favorites/1`
 
 ## Estructura
 

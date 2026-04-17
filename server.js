@@ -22,13 +22,17 @@ const requestCounters = new Map();
 const ACTION_LOG_MAX_ITEMS = 300;
 const actionLog = [];
 let actionSequence = 0;
+const favorites = [];
+let favoriteSequence = 0;
 
 app.use(
   cors({
     origin: "*",
-    methods: ["GET", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   })
 );
+
+app.use(express.json());
 
 app.use((req, res, next) => {
   const startedAt = Date.now();
@@ -87,6 +91,26 @@ app.get("/api/v1/rules", (req, res) => {
         path: "/api/v1/report",
         description: "Reporte con package.json y acciones de uso recientes.",
       },
+      {
+        method: "GET",
+        path: "/api/v1/favorites",
+        description: "Lista estaciones guardadas localmente.",
+      },
+      {
+        method: "POST",
+        path: "/api/v1/favorites",
+        description: "Crea estacion favorita.",
+      },
+      {
+        method: "PUT",
+        path: "/api/v1/favorites/:id",
+        description: "Actualiza estacion favorita por id.",
+      },
+      {
+        method: "DELETE",
+        path: "/api/v1/favorites/:id",
+        description: "Elimina estacion favorita por id.",
+      },
     ],
     parameters: {
       q: {
@@ -122,9 +146,32 @@ app.get("/api/v1/rules", (req, res) => {
         notes: "Si es true, prioriza ranking (top) y q pasa a ser opcional.",
       },
     },
+    favoritesBody: {
+      name: {
+        type: "string",
+        requiredOnPost: true,
+        minLength: 2,
+        maxLength: 80,
+      },
+      streamUrl: {
+        type: "string",
+        requiredOnPost: true,
+        notes: "URL valida con protocolo http/https.",
+      },
+      country: {
+        type: "string",
+        requiredOnPost: false,
+        maxLength: 60,
+      },
+      tags: {
+        type: "array<string> | string",
+        requiredOnPost: false,
+        notes: "Se normaliza a array de maximo 8 tags.",
+      },
+    },
     globalRules: [
       `Rate limit: ${RATE_LIMIT_MAX_REQUESTS} solicitudes por minuto por IP.`,
-      "Solo se permiten metodos GET y OPTIONS.",
+      "Se permiten metodos GET, POST, PUT, DELETE y OPTIONS.",
       "Respuestas JSON con estructura { success, data/meta o error }.",
     ],
     examples: [
@@ -133,6 +180,9 @@ app.get("/api/v1/rules", (req, res) => {
       "/api/v1/stations?q=rock&country=US&order=bitrate&limit=10",
       "/api/v1/report",
       "/api/v1/report?limit=100",
+      "POST /api/v1/favorites { name, streamUrl, country?, tags? }",
+      "PUT /api/v1/favorites/1 { name?, streamUrl?, country?, tags? }",
+      "DELETE /api/v1/favorites/1",
     ],
   });
 });
@@ -181,6 +231,139 @@ app.get("/api/v1/report", async (req, res) => {
       },
     });
   }
+});
+
+app.get("/api/v1/favorites", (req, res) => {
+  return res.json({
+    success: true,
+    data: favorites,
+    meta: {
+      total: favorites.length,
+    },
+  });
+});
+
+app.post("/api/v1/favorites", (req, res) => {
+  const validation = validateFavoritePayload(req.body, { partial: false });
+
+  if (!validation.success) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Body invalido para crear favorito.",
+        details: validation.errors,
+      },
+      docs: "/api/v1/rules",
+    });
+  }
+
+  const now = new Date().toISOString();
+  const favorite = {
+    id: ++favoriteSequence,
+    ...validation.value,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  favorites.unshift(favorite);
+
+  return res.status(201).json({
+    success: true,
+    data: favorite,
+  });
+});
+
+app.put("/api/v1/favorites/:id", (req, res) => {
+  const id = parseFavoriteId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "El parametro :id debe ser un entero positivo.",
+      },
+      docs: "/api/v1/rules",
+    });
+  }
+
+  const target = favorites.find((item) => item.id === id);
+  if (!target) {
+    return res.status(404).json({
+      success: false,
+      error: {
+        code: "NOT_FOUND",
+        message: `No existe favorito con id ${id}.`,
+      },
+    });
+  }
+
+  const validation = validateFavoritePayload(req.body, { partial: true });
+  if (!validation.success) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Body invalido para actualizar favorito.",
+        details: validation.errors,
+      },
+      docs: "/api/v1/rules",
+    });
+  }
+
+  if (Object.keys(validation.value).length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Debes enviar al menos un campo para actualizar.",
+      },
+      docs: "/api/v1/rules",
+    });
+  }
+
+  Object.assign(target, validation.value, {
+    updatedAt: new Date().toISOString(),
+  });
+
+  return res.json({
+    success: true,
+    data: target,
+  });
+});
+
+app.delete("/api/v1/favorites/:id", (req, res) => {
+  const id = parseFavoriteId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "El parametro :id debe ser un entero positivo.",
+      },
+      docs: "/api/v1/rules",
+    });
+  }
+
+  const index = favorites.findIndex((item) => item.id === id);
+  if (index === -1) {
+    return res.status(404).json({
+      success: false,
+      error: {
+        code: "NOT_FOUND",
+        message: `No existe favorito con id ${id}.`,
+      },
+    });
+  }
+
+  const deleted = favorites.splice(index, 1)[0];
+  return res.json({
+    success: true,
+    data: deleted,
+    meta: {
+      remaining: favorites.length,
+    },
+  });
 });
 
 app.get("/api/v1/stations", async (req, res) => {
@@ -378,6 +561,119 @@ function normalizeStation(station) {
     homepage: station.homepage || "",
     logo: station.favicon || "",
   };
+}
+
+function validateFavoritePayload(payload, { partial }) {
+  const errors = [];
+  const body = payload && typeof payload === "object" ? payload : {};
+  const data = {};
+
+  const hasName = Object.prototype.hasOwnProperty.call(body, "name");
+  const hasStreamUrl = Object.prototype.hasOwnProperty.call(body, "streamUrl");
+  const hasCountry = Object.prototype.hasOwnProperty.call(body, "country");
+  const hasTags = Object.prototype.hasOwnProperty.call(body, "tags");
+
+  if (!partial && !hasName) {
+    errors.push("name es requerido.");
+  }
+  if (!partial && !hasStreamUrl) {
+    errors.push("streamUrl es requerido.");
+  }
+
+  if (hasName) {
+    const name = String(body.name ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+    if (name.length < 2 || name.length > 80) {
+      errors.push("name debe tener entre 2 y 80 caracteres.");
+    } else {
+      data.name = name;
+    }
+  }
+
+  if (hasStreamUrl) {
+    const streamUrl = String(body.streamUrl ?? "").trim();
+    if (!isHttpUrl(streamUrl)) {
+      errors.push("streamUrl debe ser una URL valida con protocolo http/https.");
+    } else {
+      data.streamUrl = streamUrl;
+    }
+  }
+
+  if (hasCountry) {
+    const country = String(body.country ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+    if (country.length > 60) {
+      errors.push("country no puede superar 60 caracteres.");
+    } else {
+      data.country = country || "Pais no disponible";
+    }
+  }
+
+  if (hasTags) {
+    const tags = normalizeFavoriteTags(body.tags);
+    if (tags === null) {
+      errors.push("tags debe ser string o array de strings (maximo 8).");
+    } else {
+      data.tags = tags;
+    }
+  }
+
+  if (errors.length > 0) {
+    return { success: false, errors };
+  }
+
+  if (!partial) {
+    if (!Object.prototype.hasOwnProperty.call(data, "country")) {
+      data.country = "Pais no disponible";
+    }
+    if (!Object.prototype.hasOwnProperty.call(data, "tags")) {
+      data.tags = [];
+    }
+  }
+
+  return {
+    success: true,
+    value: data,
+  };
+}
+
+function normalizeFavoriteTags(value) {
+  const list = Array.isArray(value)
+    ? value
+    : String(value ?? "")
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+
+  if (!Array.isArray(list)) {
+    return null;
+  }
+
+  const normalized = list
+    .map((tag) => String(tag).trim())
+    .filter(Boolean)
+    .slice(0, 8);
+
+  return normalized;
+}
+
+function parseFavoriteId(rawId) {
+  const id = Number.parseInt(String(rawId ?? "").trim(), 10);
+  if (Number.isNaN(id) || id < 1) {
+    return null;
+  }
+  return id;
+}
+
+function isHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function registerAction(action) {
