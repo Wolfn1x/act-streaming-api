@@ -2,7 +2,7 @@ services:
   - type: web
     name: act-streaming-api
     runtime: node
+    plan: free
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/v1/health
-    autoDeploy: true
