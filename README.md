@@ -21,6 +21,7 @@ Crear una API publica de streaming con reglas claras, parametros controlados y e
 1. `GET /api/v1/health`
 2. `GET /api/v1/rules`
 3. `GET /api/v1/stations`
+4. `GET /api/v1/report`
 
 ## Reglas y Parametros de `/api/v1/stations`
 
@@ -29,6 +30,14 @@ Crear una API publica de streaming con reglas claras, parametros controlados y e
 - `order`: orden permitido (opcional): `votes`, `clickcount`, `bitrate`, `name`.
 - `limit`: cantidad de resultados (opcional, entero entre `1` y `50`, default `24`).
 - `top`: booleano (opcional): `true`/`false` o `1`/`0`.
+
+## Reglas y Parametros de `/api/v1/report`
+
+- `limit`: cantidad de acciones a devolver en el reporte (opcional, entero entre `1` y `200`, default `50`).
+- Devuelve:
+  - `packageJson`: contenido completo de `package.json`.
+  - `actions`: bitacora de acciones de uso (metodo, ruta, estado, duracion, ip, timestamp).
+  - `meta`: resumen de acciones registradas.
 
 Reglas globales:
 
@@ -45,6 +54,7 @@ curl "http://localhost:3000/api/v1/health"
 curl "http://localhost:3000/api/v1/rules"
 curl "http://localhost:3000/api/v1/stations?top=true&order=votes&limit=10"
 curl "http://localhost:3000/api/v1/stations?q=rock&country=US&order=bitrate&limit=12"
+curl "http://localhost:3000/api/v1/report?limit=20"
 ```
 
 ## Estructura

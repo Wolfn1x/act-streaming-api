@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import path from "node:path";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +19,9 @@ const MIN_LIMIT = 1;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 60;
 const requestCounters = new Map();
+const ACTION_LOG_MAX_ITEMS = 300;
+const actionLog = [];
+let actionSequence = 0;
 
 app.use(
   cors({
@@ -25,6 +29,24 @@ app.use(
     methods: ["GET", "OPTIONS"],
   })
 );
+
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+
+  res.on("finish", () => {
+    registerAction({
+      id: ++actionSequence,
+      at: new Date().toISOString(),
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      durationMs: Date.now() - startedAt,
+      ip: getClientIp(req),
+    });
+  });
+
+  next();
+});
 
 app.use("/api/v1", publicRateLimit);
 
@@ -59,6 +81,11 @@ app.get("/api/v1/rules", (req, res) => {
         method: "GET",
         path: "/api/v1/stations",
         description: "Busca estaciones por parametros.",
+      },
+      {
+        method: "GET",
+        path: "/api/v1/report",
+        description: "Reporte con package.json y acciones de uso recientes.",
       },
     ],
     parameters: {
@@ -104,8 +131,56 @@ app.get("/api/v1/rules", (req, res) => {
       "/api/v1/stations?top=true&order=votes&limit=12",
       "/api/v1/stations?q=jazz&country=MX&order=clickcount&limit=20",
       "/api/v1/stations?q=rock&country=US&order=bitrate&limit=10",
+      "/api/v1/report",
+      "/api/v1/report?limit=100",
     ],
   });
+});
+
+app.get("/api/v1/report", async (req, res) => {
+  const limitRaw = String(req.query.limit ?? "50").trim();
+  const limit = Number.parseInt(limitRaw, 10);
+
+  if (Number.isNaN(limit) || limit < 1 || limit > 200) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "limit para /api/v1/report debe ser numero entero entre 1 y 200.",
+      },
+      docs: "/api/v1/rules",
+    });
+  }
+
+  try {
+    const packagePath = path.join(__dirname, "package.json");
+    const packageContent = await readFile(packagePath, "utf-8");
+    const packageJson = JSON.parse(packageContent);
+    const actions = actionLog.slice(0, limit);
+    const actionsByPath = buildPathSummary(actionLog);
+
+    return res.json({
+      success: true,
+      data: {
+        packageJson,
+        actions,
+      },
+      meta: {
+        totalActions: actionLog.length,
+        returnedActions: actions.length,
+        maxStoredActions: ACTION_LOG_MAX_ITEMS,
+        actionsByPath,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "REPORT_ERROR",
+        message: "No fue posible generar el reporte con package.json.",
+      },
+    });
+  }
 });
 
 app.get("/api/v1/stations", async (req, res) => {
@@ -303,6 +378,21 @@ function normalizeStation(station) {
     homepage: station.homepage || "",
     logo: station.favicon || "",
   };
+}
+
+function registerAction(action) {
+  actionLog.unshift(action);
+  if (actionLog.length > ACTION_LOG_MAX_ITEMS) {
+    actionLog.pop();
+  }
+}
+
+function buildPathSummary(actions) {
+  return actions.reduce((acc, item) => {
+    const key = item.path?.split("?")[0] || "/";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
 }
 
 function publicRateLimit(req, res, next) {
