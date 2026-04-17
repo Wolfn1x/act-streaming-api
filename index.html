@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Act Streaming | Radio en Vivo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="orb orb-a" aria-hidden="true"></div>
+    <div class="orb orb-b" aria-hidden="true"></div>
+
+    <main class="app">
+      <header class="hero">
+        <p class="badge">APLICACIONES WEB ORIENTADAS A SERVICIOS</p>
+        <h1>Act Streaming: Buscador de Radio en Vivo</h1>
+        <p>
+          Proyecto web que consume una API publica de streaming para buscar
+          estaciones y reproducirlas en tiempo real desde el navegador.
+        </p>
+      </header>
+
+      <section class="panel controls-panel">
+        <div class="panel-head">
+          <h2>Explorador</h2>
+          <button id="topBtn" class="btn btn-secondary" type="button">
+            Top global
+          </button>
+        </div>
+
+        <form id="searchForm" class="controls" novalidate>
+          <label>
+            <span>Buscar estacion</span>
+            <input
+              id="searchInput"
+              type="search"
+              placeholder="Ejemplo: jazz, pop, noticias..."
+              autocomplete="off"
+            />
+          </label>
+
+          <label>
+            <span>Pais</span>
+            <select id="countrySelect">
+              <option value="">Todos</option>
+              <option value="US">Estados Unidos</option>
+              <option value="MX">Mexico</option>
+              <option value="ES">Espana</option>
+              <option value="AR">Argentina</option>
+              <option value="CO">Colombia</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Ordenar por</span>
+            <select id="orderSelect">
+              <option value="votes">Mas votos</option>
+              <option value="clickcount">Mas escuchadas</option>
+              <option value="bitrate">Mayor bitrate</option>
+              <option value="name">Nombre (A-Z)</option>
+            </select>
+          </label>
+
+          <button class="btn btn-primary" type="submit">Buscar</button>
+        </form>
+      </section>
+
+      <section class="panel player-panel" aria-live="polite">
+        <div class="player-head">
+          <h2>Reproductor</h2>
+          <p id="playerMeta" class="muted">No hay estacion seleccionada</p>
+        </div>
+        <p id="nowPlaying" class="now-playing">Selecciona una estacion.</p>
+        <audio id="audioPlayer" controls preload="none"></audio>
+      </section>
+
+      <section class="panel results-panel">
+        <div class="panel-head">
+          <h2>Estaciones disponibles</h2>
+          <p id="resultsMeta" class="muted">Sin resultados</p>
+        </div>
+        <p id="statusBox" class="status">Cargando top global...</p>
+        <div id="resultsGrid" class="results-grid"></div>
+      </section>
+    </main>
+
+    <template id="stationTemplate">
+      <article class="station-card">
+        <img class="station-logo" alt="Logo de la estacion" />
+        <div class="station-body">
+          <h3 class="station-name"></h3>
+          <p class="station-tags"></p>
+          <div class="chips">
+            <span class="chip station-country"></span>
+            <span class="chip station-codec"></span>
+            <span class="chip station-bitrate"></span>
+          </div>
+          <p class="station-stats"></p>
+          <div class="station-actions">
+            <button class="btn btn-primary play-btn" type="button">
+              Reproducir
+            </button>
+            <a
+              class="btn btn-link site-link"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Sitio</a
+            >
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>

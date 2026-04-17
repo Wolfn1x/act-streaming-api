@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: act-streaming-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
